@@ -897,8 +897,8 @@ impl_enum! {
         SGX_EXCEPTION_VECTOR_BP = 3,  /* INT 3 instruction */
         SGX_EXCEPTION_VECTOR_BR = 5,  /* BOUND instruction */
         SGX_EXCEPTION_VECTOR_UD = 6,  /* UD2 instruction or reserved opcode */
-        SGX_EXCEPTION_VECTOR_GP = 13, /* General protection exception */
-        SGX_EXCEPTION_VECTOR_PF = 14, /* Page fault exception */
+        SGX_EXCEPTION_VECTOR_GP = 13, /* General protection */
+        SGX_EXCEPTION_VECTOR_PF = 14, /* Page fault */
         SGX_EXCEPTION_VECTOR_MF = 16, /* x87 FPU floating-point or WAIT/FWAIT instruction */
         SGX_EXCEPTION_VECTOR_AC = 17, /* Any data reference in memory */
         SGX_EXCEPTION_VECTOR_XM = 19, /* SSE/SSE2/SSE3 floating-point instruction */
@@ -912,6 +912,7 @@ impl_enum! {
     pub enum sgx_exception_type_t {
         SGX_EXCEPTION_HARDWARE = 3,
         SGX_EXCEPTION_SOFTWARE = 6,
+        SGX_EXCEPTION_SIMULATED = 7,
     }
 }
 
@@ -958,10 +959,19 @@ cfg_if! {
 }
 
 impl_struct! {
+    pub struct sgx_exinfo_t {
+        pub maddr: u64,
+        pub errcd: u32,
+        pub _unused: u32,
+    }
+}
+
+impl_struct! {
     pub struct sgx_exception_info_t {
         pub cpu_context: sgx_cpu_context_t,
         pub exception_vector: sgx_exception_vector_t,
         pub exception_type: sgx_exception_type_t,
+        pub exinfo: sgx_exinfo_t,
     }
 }
 
