@@ -17,7 +17,7 @@
 
 //! Filesystem manipulation operations.
 
-use sgx_types::{sgx_key_128bit_t, sgx_align_key_128bit_t};
+use sgx_types::{sgx_key_128bit_t, sgx_align_key_128bit_t, sgx_aes_gcm_128bit_tag_t};
 use crate::io::{self, SeekFrom, Seek, Read, Initializer, Write};
 use crate::path::Path;
 use crate::sys::sgxfs as fs_imp;
@@ -109,6 +109,19 @@ impl SgxFile {
         OpenOptions::new().read(true).open(path.as_ref())
     }
 
+    /// Attempts to open a file in read-only and integrity-only mode.
+    ///
+    /// See the [`OpenOptions::open`] method for more details.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if `path` does not already exist.
+    /// Other errors may also be returned according to [`OpenOptions::open`].
+    ///
+    pub fn open_integrity_only<P: AsRef<Path>>(path: P) -> io::Result<SgxFile> {
+        OpenOptions::new().read(true).open_integrity_only(path.as_ref())
+    }
+
     /// Opens a file in write-only mode.
     ///
     /// This function will create a file if it does not exist,
@@ -116,6 +129,15 @@ impl SgxFile {
     ///
     pub fn create<P: AsRef<Path>>(path: P) -> io::Result<SgxFile> {
         OpenOptions::new().write(true).open(path.as_ref())
+    }
+
+    /// Opens a file in write-only and integrity-only mode.
+    ///
+    /// This function will create a file if it does not exist,
+    /// and will truncate it if it does.
+    ///
+    pub fn create_integrity_only<P: AsRef<Path>>(path: P) -> io::Result<SgxFile> {
+        OpenOptions::new().write(true).open_integrity_only(path.as_ref())
     }
 
     pub fn open_ex<P: AsRef<Path>>(path: P, key: &sgx_key_128bit_t) -> io::Result<SgxFile> {
@@ -136,6 +158,12 @@ impl SgxFile {
 
     pub fn clear_cache(&self) -> io::Result<()> {
         self.inner.clear_cache()
+    }
+
+    /// Gets the MAC of the SGX protected file
+    ///
+    pub fn get_mac(&self) -> io::Result<sgx_aes_gcm_128bit_tag_t> {
+        self.inner.get_mac()
     }
 }
 
@@ -273,6 +301,10 @@ impl OpenOptions {
         self._open_ex(path.as_ref(), key)
     }
 
+    pub fn open_integrity_only<P: AsRef<Path>>(&self, path: P) -> io::Result<SgxFile> {
+        self._open_integrity_only(path.as_ref())
+    }
+
     fn _open(&self, path: &Path) -> io::Result<SgxFile> {
         let inner = fs_imp::SgxFile::open(path, &self.0)?;
         Ok(SgxFile { inner: inner })
@@ -280,6 +312,11 @@ impl OpenOptions {
 
     fn _open_ex(&self, path: &Path, key: &sgx_key_128bit_t) -> io::Result<SgxFile> {
         let inner = fs_imp::SgxFile::open_ex(path, &self.0, key)?;
+        Ok(SgxFile { inner: inner })
+    }
+
+    fn _open_integrity_only(&self, path: &Path) -> io::Result<SgxFile> {
+        let inner = fs_imp::SgxFile::open_integrity_only(path, &self.0)?;
         Ok(SgxFile { inner: inner })
     }
 }
