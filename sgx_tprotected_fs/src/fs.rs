@@ -39,6 +39,15 @@ unsafe fn rsgx_fopen(filename: &CStr, mode: &CStr, key: &sgx_key_128bit_t) -> Sy
     }
 }
 
+unsafe fn rsgx_fopen_integrity_only(filename: &CStr, mode: &CStr) -> SysResult<SGX_FILE> {
+    let file = sgx_fopen_integrity_only(filename.as_ptr(), mode.as_ptr());
+    if file.is_null() {
+        Err(errno())
+    } else {
+        Ok(file)
+    }
+}
+
 unsafe fn rsgx_fopen_auto_key(filename: &CStr, mode: &CStr) -> SysResult<SGX_FILE> {
     let file = sgx_fopen_auto_key(filename.as_ptr(), mode.as_ptr());
     if file.is_null() {
@@ -196,6 +205,15 @@ unsafe fn rsgx_fimport_auto_key(filename: &CStr, key: &sgx_key_128bit_t) -> SysE
     }
 }
 
+unsafe fn rsgx_fget_mac(stream: SGX_FILE, mac: &mut sgx_aes_gcm_128bit_tag_t) -> SysError {
+    let ret = sgx_fget_mac(stream, mac as * mut sgx_aes_gcm_128bit_tag_t);
+    if ret == 0 {
+        Ok(())
+    } else {
+        Err(errno())
+    }
+}
+
 pub struct SgxFileStream {
     stream: SGX_FILE,
 }
@@ -273,6 +291,48 @@ impl SgxFileStream {
     ///
     pub fn open_auto_key(filename: &CStr, mode: &CStr) -> SysResult<SgxFileStream> {
         unsafe { rsgx_fopen_auto_key(filename, mode).map(|f| SgxFileStream { stream: f }) }
+    }
+
+    ///
+    /// The open function creates or opens a protected file in the integrity-only mode.
+    ///
+    /// # Description
+    ///
+    /// open_integrity_only is different from open and open_auto_key.
+    /// The protected file opened by this function is in integrity-only mode.
+    /// In this mode, the content of the file is not encrypted, only MACed.
+    ///
+    /// A protected file created by open_integrity_only cannot later be openned
+    /// by open or open_auto_key and vice versa.
+    ///
+    /// # Parameters
+    ///
+    /// **filename**
+    ///
+    /// The name of the file to be created or opened.
+    ///
+    /// **mode**
+    ///
+    /// The file open mode string. Allowed values are any combination of, or, with possible
+    /// and possible (since string functions are currently not sup- ported, is meaningless).
+    ///
+    /// # Requirements
+    ///
+    /// Header: sgx_tprotected_fs.edl
+    ///
+    /// Library: libsgx_tprotected_fs.a
+    ///
+    /// This API is provided by Occlum's fork of Intel SGX SDK.
+    ///
+    /// # Return value
+    ///
+    /// If the function succeeds, it returns a valid file pointer, which can be used by all the other functions
+    /// in the Protected FS API, otherwise, error code is returned.
+    ///
+    pub fn open_integrity_only(filename: &CStr, mode: &CStr) -> SysResult<SgxFileStream> {
+        unsafe {
+            rsgx_fopen_integrity_only(filename, mode).map(|f| SgxFileStream{ stream: f})
+        }
     }
 
     ///
@@ -514,6 +574,30 @@ impl SgxFileStream {
     ///
     pub fn clear_cache(&self) -> SysError {
         unsafe { rsgx_fclear_cache(self.stream) }
+    }
+
+    ///
+    /// The get_mac function returns the MAC of the protected file.
+    ///
+    /// # Description
+    ///
+    /// # Requirements
+    ///
+    /// Header: sgx_tprotected_fs.edl
+    ///
+    /// Library: libsgx_tprotected_fs.a
+    ///
+    /// This API is provided by Occlum's fork of Intel SGX SDK.
+    ///
+    /// # Return value
+    ///
+    /// If the function succeeded, the MAC is returned.
+    /// If the function failed, error code is returned.
+    ///
+    pub fn get_mac(&self) -> SysResult<sgx_aes_gcm_128bit_tag_t> {
+        let mut mac : sgx_aes_gcm_128bit_tag_t = Default::default();
+        unsafe { rsgx_fget_mac(self.stream, &mut mac)?; }
+        Ok(mac)
     }
 }
 
