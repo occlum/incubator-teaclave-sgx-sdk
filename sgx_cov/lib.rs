@@ -70,9 +70,10 @@ pub extern "C" fn llvm_gcov_init(
     _reset: extern "C" fn(),
 ) {
     INIT.call_once(|| {
-        let mut rng = sgx_rand::thread_rng();
+        let mut rand_buf: [u8; 4] = [0; 4];
+        sgx_trts::trts::rsgx_read_rand(&mut rand_buf).unwrap();
         let mut rnd = RND.lock().unwrap();
-        *rnd = rng.gen();
+        *rnd = u32::from_le_bytes(rand_buf);
     });
     let mut writeout_fns = WROUT_FNS.lock().unwrap();
     writeout_fns.push(writeout);

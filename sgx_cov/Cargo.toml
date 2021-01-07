@@ -20,3 +20,4 @@ profiler_builtins = { git = "https://github.com/mesalock-linux/sgx-fake-profiler
 sgx_types   = { path = "../sgx_types" }
 sgx_tstd    = { path = "../sgx_tstd" }
 sgx_rand    = { path = "../sgx_rand" }
+sgx_trts    = { path = "../sgx_trts" }
