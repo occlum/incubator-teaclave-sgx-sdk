@@ -350,4 +350,3 @@ fn test_main_entrance() -> size_t {
                     test_exception_handler,
                     )
 }
-
