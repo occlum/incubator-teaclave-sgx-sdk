@@ -121,11 +121,22 @@ void se_event_destroy(se_handle_t se_event)
 
 int se_event_wait(se_handle_t se_event)
 {
+    int ret = 0;
     if (se_event == NULL)
         return EINVAL;
 
     if (__sync_fetch_and_add((int*)se_event, -1) == 0)
-        syscall(__NR_futex, se_event, FUTEX_WAIT, -1, NULL, NULL, 0);
+        ret = syscall(__NR_futex, se_event, FUTEX_WAIT, -1, NULL, NULL, 0);
+
+    // Notes for Occlum:
+    // This futex syscall could be interrupted by SIG64 which is not registered with "SA_RESTART"
+    // and could cause se_event to be "-1" at this time.
+    // It could also be EAGAIN if se_event is waken before syscall.
+    if (ret < 0 && errno != EINTR && errno != EAGAIN)  {
+        abort();
+    }
+    // Guarantee se_event to be 0 when return.
+    __sync_val_compare_and_swap((int*)se_event, -1, 0);
 
     return 0;
 }
