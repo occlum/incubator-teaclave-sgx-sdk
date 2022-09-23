@@ -61,13 +61,15 @@ unsafe fn rsgx_fopen_ex(
     filename: &CStr,
     mode: &CStr,
     key: Option<&sgx_key_128bit_t>,
-    cache_size: u64,
+    key_policy: Option<u16>,
+    cache_size: Option<u64>,
 ) -> SysResult<SGX_FILE> {
     let file = sgx_fopen_ex(
         filename.as_ptr(),
         mode.as_ptr(),
         key.map_or(core::ptr::null(), |key| key as *const sgx_key_128bit_t),
-        cache_size,
+        key_policy.unwrap_or_default(),
+        cache_size.unwrap_or_default(),
     );
     if file.is_null() {
         Err(errno())
@@ -215,8 +217,16 @@ unsafe fn rsgx_fexport_auto_key(filename: &CStr, key: &mut sgx_key_128bit_t) -> 
     }
 }
 
-unsafe fn rsgx_fimport_auto_key(filename: &CStr, key: &sgx_key_128bit_t) -> SysError {
-    let ret = sgx_fimport_auto_key(filename.as_ptr(), key as *const sgx_key_128bit_t);
+unsafe fn rsgx_fimport_auto_key(
+    filename: &CStr,
+    key: &sgx_key_128bit_t,
+    key_policy: Option<u16>,
+) -> SysError {
+    let ret = sgx_fimport_auto_key(
+        filename.as_ptr(),
+        key as *const sgx_key_128bit_t,
+        key_policy.unwrap_or_default(),
+    );
     if ret == 0 {
         Ok(())
     } else {
@@ -225,7 +235,7 @@ unsafe fn rsgx_fimport_auto_key(filename: &CStr, key: &sgx_key_128bit_t) -> SysE
 }
 
 unsafe fn rsgx_fget_mac(stream: SGX_FILE, mac: &mut sgx_aes_gcm_128bit_tag_t) -> SysError {
-    let ret = sgx_fget_mac(stream, mac as * mut sgx_aes_gcm_128bit_tag_t);
+    let ret = sgx_fget_mac(stream, mac as *mut sgx_aes_gcm_128bit_tag_t);
     if ret == 0 {
         Ok(())
     } else {
@@ -349,9 +359,7 @@ impl SgxFileStream {
     /// in the Protected FS API, otherwise, error code is returned.
     ///
     pub fn open_integrity_only(filename: &CStr, mode: &CStr) -> SysResult<SgxFileStream> {
-        unsafe {
-            rsgx_fopen_integrity_only(filename, mode).map(|f| SgxFileStream{ stream: f})
-        }
+        unsafe { rsgx_fopen_integrity_only(filename, mode).map(|f| SgxFileStream { stream: f }) }
     }
 
     ///
@@ -380,6 +388,10 @@ impl SgxFileStream {
     /// keys for the file. If the file is created with open, you should protect this key and provide it as
     /// input every time the file is opened.
     ///
+    /// **key_policy**
+    ///
+    /// Specifies the measurement to use in enclave's SEAL key derivation.
+    ///
     /// **cache_size**
     ///
     /// Internal cache size in byte, which used to cache R/W data in enclave before flush to actual file.
@@ -402,10 +414,15 @@ impl SgxFileStream {
         filename: &CStr,
         mode: &CStr,
         key: Option<&sgx_key_128bit_t>,
-        cache_size: u64,
+        key_policy: Option<u16>,
+        cache_size: Option<u64>,
     ) -> SysResult<SgxFileStream> {
+        if key.is_some() && key_policy.is_some() {
+            return Err(libc::EINVAL);
+        }
         unsafe {
-            rsgx_fopen_ex(filename, mode, key, cache_size).map(|f| SgxFileStream { stream: f })
+            rsgx_fopen_ex(filename, mode, key, key_policy, cache_size)
+                .map(|f| SgxFileStream { stream: f })
         }
     }
 
@@ -669,8 +686,10 @@ impl SgxFileStream {
     /// If the function failed, error code is returned.
     ///
     pub fn get_mac(&self) -> SysResult<sgx_aes_gcm_128bit_tag_t> {
-        let mut mac : sgx_aes_gcm_128bit_tag_t = Default::default();
-        unsafe { rsgx_fget_mac(self.stream, &mut mac)?; }
+        let mut mac: sgx_aes_gcm_128bit_tag_t = Default::default();
+        unsafe {
+            rsgx_fget_mac(self.stream, &mut mac)?;
+        }
         Ok(mac)
     }
 }
@@ -755,7 +774,11 @@ pub fn export_align_auto_key(filename: &CStr) -> SysResult<sgx_align_key_128bit_
 ///
 /// **key**
 ///
-/// he encryption key, exported with a call to export_auto_key in the source enclave or system.
+/// The encryption key, exported with a call to export_auto_key in the source enclave or system.
+///
+/// **key_policy**
+///
+/// Specifies the measurement to use in enclave's SEAL key derivation.
 ///
 /// # Requirements
 ///
@@ -767,8 +790,12 @@ pub fn export_align_auto_key(filename: &CStr) -> SysResult<sgx_align_key_128bit_
 ///
 /// otherwise, error code is returned.
 ///
-pub fn import_auto_key(filename: &CStr, key: &sgx_key_128bit_t) -> SysError {
-    unsafe { rsgx_fimport_auto_key(filename, key) }
+pub fn import_auto_key(
+    filename: &CStr,
+    key: &sgx_key_128bit_t,
+    key_policy: Option<u16>,
+) -> SysError {
+    unsafe { rsgx_fimport_auto_key(filename, key, key_policy) }
 }
 
 impl Drop for SgxFileStream {

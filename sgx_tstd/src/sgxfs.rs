@@ -144,16 +144,16 @@ impl SgxFile {
         OpenOptions::new().read(true).open_ex(path.as_ref(), key)
     }
 
-    pub fn open_with<P: AsRef<Path>>(path: P, key: Option<&sgx_key_128bit_t>, cache_size: Option<u64>) -> io::Result<SgxFile> {
-        OpenOptions::new().read(true).open_with(path.as_ref(), key, cache_size)
+    pub fn open_with<P: AsRef<Path>>(path: P, key: Option<&sgx_key_128bit_t>, key_policy: Option<u16>, cache_size: Option<u64>) -> io::Result<SgxFile> {
+        OpenOptions::new().read(true).open_with(path.as_ref(), key, key_policy, cache_size)
     }
 
     pub fn create_ex<P: AsRef<Path>>(path: P, key: &sgx_key_128bit_t) -> io::Result<SgxFile> {
         OpenOptions::new().write(true).open_ex(path.as_ref(), key)
     }
 
-    pub fn create_with<P: AsRef<Path>>(path: P, key: Option<&sgx_key_128bit_t>, cache_size: Option<u64>) -> io::Result<SgxFile> {
-        OpenOptions::new().write(true).open_with(path.as_ref(), key, cache_size)
+    pub fn create_with<P: AsRef<Path>>(path: P, key: Option<&sgx_key_128bit_t>, key_policy: Option<u16>, cache_size: Option<u64>) -> io::Result<SgxFile> {
+        OpenOptions::new().write(true).open_with(path.as_ref(), key, key_policy, cache_size)
     }
 
     pub fn is_eof(&self) -> bool {
@@ -303,8 +303,8 @@ impl OpenOptions {
         self._open_integrity_only(path.as_ref())
     }
 
-    pub fn open_with<P: AsRef<Path>>(&self, path: P, key: Option<&sgx_key_128bit_t>, cache_size: Option<u64>) -> io::Result<SgxFile> {
-        self._open_with(path.as_ref(), key, cache_size)
+    pub fn open_with<P: AsRef<Path>>(&self, path: P, key: Option<&sgx_key_128bit_t>, key_policy: Option<u16>, cache_size: Option<u64>) -> io::Result<SgxFile> {
+        self._open_with(path.as_ref(), key, key_policy, cache_size)
     }
 
     fn _open(&self, path: &Path) -> io::Result<SgxFile> {
@@ -319,11 +319,11 @@ impl OpenOptions {
 
     fn _open_integrity_only(&self, path: &Path) -> io::Result<SgxFile> {
         let inner = fs_imp::SgxFile::open_integrity_only(path, &self.0)?;
-        Ok(SgxFile { inner: inner })
+        Ok(SgxFile { inner })
     }
 
-    fn _open_with(&self, path: &Path, key: Option<&sgx_key_128bit_t>, cache_size: Option<u64>) -> io::Result<SgxFile> {
-        let inner = fs_imp::SgxFile::open_with(path, &self.0, key, cache_size)?;
+    fn _open_with(&self, path: &Path, key: Option<&sgx_key_128bit_t>, key_policy: Option<u16>, cache_size: Option<u64>) -> io::Result<SgxFile> {
+        let inner = fs_imp::SgxFile::open_with(path, &self.0, key, key_policy, cache_size)?;
         Ok(SgxFile { inner })
     }
 }
@@ -344,8 +344,8 @@ pub fn export_align_auto_key<P: AsRef<Path>>(path: P) -> io::Result<sgx_align_ke
     fs_imp::export_align_auto_key(path.as_ref())
 }
 
-pub fn import_auto_key<P: AsRef<Path>>(path: P, key: &sgx_key_128bit_t) -> io::Result<()> {
-    fs_imp::import_auto_key(path.as_ref(), key)
+pub fn import_auto_key<P: AsRef<Path>>(path: P, key: &sgx_key_128bit_t, key_policy: Option<u16>) -> io::Result<()> {
+    fs_imp::import_auto_key(path.as_ref(), key, key_policy)
 }
 
 /// Copies the contents of one file to another.
